@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container my-4">
+        <!-- Header Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white py-3">
+                <h1 class="h3 mb-0">Analisis Regresi Linear</h1>
+            </div>
+            <div class="card-body">
+                <!-- tambahkan enctype untuk upload file -->
+                <form method="POST" enctype="multipart/form-data" class="mb-3">
+                    <input type="hidden" name="k" value="{{ k }}">
+                    <input type="hidden" name="length" value="{{ length }}">
+
+                    <!-- CSV upload section -->
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">Upload CSV (opsional)</label>
+                        <input class="form-control form-control-sm" type="file" id="csv_file" name="csv_file" accept=".csv,text/csv">
+                        <div class="form-text mb-2">
+                            Format: kolom pertama = Y, kolom berikutnya = X1, X2, ...; baris pertama boleh header.
+                        </div>
+                        <button type="submit" name="action" value="upload_csv" class="btn btn-warning btn-sm">
+                            Upload CSV
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Y</th>
+                                    {% for j in range(k) %}
+                                    <th>
+                                        X{{ j+1 }}
+                                        {% if k > 1 %}
+                                        <button type="submit" name="action" value="del_col{{ j }}"
+                                            class="btn btn-sm btn-outline-danger ms-1">−</button>
+                                        {% endif %}
+                                    </th>
+                                    {% endfor %}
+                                    <th>
+                                        <button type="submit" name="action" value="add_col"
+                                            class="btn btn-sm btn-outline-primary">+ Kolom</button>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in range(length) %}
+                                <tr>
+                                    <!-- kolom Y -->
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm" name="y_{{ i }}"
+                                            value="{{ y_vals[i] }}" placeholder="Y">
+                                    </td>
+                                    <!-- kolom X1 ... Xk -->
+                                    {% for j in range(k) %}
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm" name="x_{{ i }}_{{ j }}"
+                                            value="{{ x_vals[i][j] }}" placeholder="X{{ j+1 }}">
+                                    </td>
+                                    {% endfor %}
+                                    <td>
+                                        {% if length > k + 2 %}
+                                        <button type="submit" name="action" value="del_row{{ i }}"
+                                            class="btn btn-outline-danger btn-sm">×</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="submit" name="action" value="add_row" class="btn btn-success btn-sm">
+                            + Baris
+                        </button>
+                        <button type="submit" name="action" value="submit" class="btn btn-primary btn-sm">
+                            Hitung Regresi
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="location.reload()">
+                            Atur Ulang
+                        </button>
+                    </div>
+                </form>
+                <small class="text-muted">
+                    Masukkan nilai numerik (desimal & negatif didukung). Minimal 3 titik data diperlukan.
+                </small>
+            </div>
+        </div>
+
+        <!-- Error Alert -->
+        {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>{{ error }}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+
+        <!-- Results Section -->
+        {% if results %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Hasil Regresi Linear</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                    <tr>
+                        <th>Intercept (b₀)</th>
+                        <td class="font-monospace">{{ results.intercept }}</td>
+                    </tr>
+                    {% for c in range(k) %}
+                    <tr>
+                        <th>Slope X<sub>{{ c+1 }}</sub> (b<sub>{{ c+1 }}</sub>)</th>
+                        <td class="font-monospace">{{ results.slope[c] }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <th>R²</th>
+                        <td class="font-monospace">{{ results.r2 }}</td>
+                    </tr>
+                </table>
+
+                <!-- F-Test Results -->
+                <div class="mt-4">
+                    <h6 class="border-bottom pb-2">Uji-F (Signifikansi Model)</h6>
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Statistik</th>
+                                <th>Nilai</th>
+                                <th>Derajat Kebebasan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>F-Statistic</td>
+                                <td class="font-monospace">{{ results.f_statistic }}</td>
+                                <td class="font-monospace">({{ results.df_regression }}, {{ results.df_residual }})</td>
+                            </tr>
+                            <tr>
+                                <td>P-value (F-test)</td>
+                                <td class="font-monospace">{{ results.f_pvalue }}</td>
+                                <td>-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- T-Test Results -->
+                <div class="mt-4">
+                    <h6 class="border-bottom pb-2">Uji-t (Signifikansi Koefisien)</h6>
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Predictor</th>
+                                <th>T Hitung</th>
+                                <th>P-Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Intercept</td>
+                                <td class="font-monospace">{{ results.tstat_intercept }}</td>
+                                <td class="font-monospace">{{ results.pval_intercept }}</td>
+                            </tr>
+                            {% for c in range(k) %}
+                            <tr>
+                                <td>X{{ c+1 }}</td>
+                                <td class="font-monospace">{{ results.tstat[c] }}</td>
+                                <td class="font-monospace">{{ results.pval[c] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Interpretation -->
+                <div class="alert alert-info mt-3 mb-0">
+                    <small>
+                        <strong>Interpretasi:</strong>
+                        <ul class="mb-0">
+                            <li><strong>Uji-F:</strong> 
+                                {% if results.f_pvalue|float < 0.05 %}
+                                <span class="text-success">Model signifikan secara statistik (p &lt; 0.05)</span>
+                                {% else %}
+                                <span class="text-danger">Model tidak signifikan secara statistik (p ≥ 0.05)</span>
+                                {% endif %}
+                                - menguji apakah model secara keseluruhan memiliki kemampuan prediksi yang baik
+                            </li>
+                            <li><strong>Uji-t:</strong> Koefisien dengan p-value &lt; 0.05 signifikan pada α=5% - menguji signifikansi masing-masing prediktor</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grafik Visualisasi -->
+        {% if plot_url %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Visualisasi Regresi</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="data:image/png;base64,{{ plot_url }}" class="img-fluid" alt="Regression Plot">
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
